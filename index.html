@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV to PDF Pro Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1e293b, #0f172a);
+            min-height: 100vh;
+            color: white;
+        }
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .custom-loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
+                CSV to PDF Pro
+            </h1>
+            <p class="text-slate-400">अपनी CSV फ़ाइल अपलोड करें और उसे तुरंत प्रीमियम PDF में बदलें</p>
+        </header>
+
+        <div class="glass-morphism rounded-3xl p-6 md:p-10 shadow-2xl">
+            
+            <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-2xl p-8 text-center hover:border-blue-500 transition-all cursor-pointer mb-8 group">
+                <input type="file" id="csv-file" accept=".csv" class="hidden">
+                <div class="flex flex-col items-center">
+                    <svg class="w-16 h-16 text-slate-500 group-hover:text-blue-500 transition-colors mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-lg font-semibold" id="file-name-display">फ़ाइल यहाँ खींचें या क्लिक करें</p>
+                    <p class="text-sm text-slate-500 mt-1">केवल .CSV फ़ाइलें समर्थित हैं</p>
+                </div>
+            </div>
+
+            <div id="action-area" class="hidden space-y-6">
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <button id="download-btn" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        PDF डाउनलोड करें
+                    </button>
+
+                    <button id="print-btn" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        प्रिंट सेटिंग्स खोलें
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-700">
+                    <table id="preview-table" class="w-full text-sm text-left text-slate-300">
+                        </table>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center text-slate-500 text-sm">
+            &copy; 2026 By POORAN KUMAR PATEL 
+        </footer>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const fileInput = document.getElementById('csv-file');
+        const dropZone = document.getElementById('drop-zone');
+        const actionArea = document.getElementById('action-area');
+        const previewTable = document.getElementById('preview-table');
+        let csvData = [];
+        let csvHeaders = [];
+
+        // UI Interactions
+        dropZone.onclick = () => fileInput.click();
+        
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        };
+
+        function handleFile(file) {
+            document.getElementById('file-name-display').innerText = file.name;
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    csvData = results.data;
+                    csvHeaders = results.meta.fields;
+                    renderPreview();
+                    actionArea.classList.remove('hidden');
+                }
+            });
+        }
+
+        function renderPreview() {
+            let html = `<thead class="bg-slate-800 text-white"><tr>`;
+            csvHeaders.forEach(h => html += `<th class="px-4 py-3 border-b border-slate-700">${h}</th>`);
+            html += `</tr></thead><tbody>`;
+            
+            csvData.slice(0, 5).forEach(row => {
+                html += `<tr class="border-b border-slate-800">`;
+                csvHeaders.forEach(h => html += `<td class="px-4 py-2">${row[h] || ''}</td>`);
+                html += `</tr>`;
+            });
+            html += `</tbody>`;
+            previewTable.innerHTML = html;
+        }
+
+        // Generate Filename (dd_mm_yyyy.pdf)
+        function getFormattedDate() {
+            const d = new Date();
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}_${month}_${year}.pdf`;
+        }
+
+        // PDF Logic
+        function generatePDF(isPrint = false) {
+            const doc = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            doc.autoTable({
+                head: [csvHeaders],
+                body: csvData.map(row => csvHeaders.map(h => row[h])),
+                theme: 'striped',
+                headStyles: { fillColor: [30, 41, 59] },
+                styles: { fontSize: 8 }
+            });
+
+            if (isPrint) {
+                // System Print Layout Browser Trigger
+                doc.autoPrint();
+                window.open(doc.output('bloburl'), '_blank');
+            } else {
+                doc.save(getFormattedDate());
+            }
+        }
+
+        document.getElementById('download-btn').onclick = () => generatePDF(false);
+        
+        document.getElementById('print-btn').onclick = () => {
+            // हमने यहाँ PDF को नए टैब में खोला है ताकि सिस्टम का 
+            // नेटिव प्रिंट डायलॉग (जिसमें Portrait, Landscape, Paper size होता है) लोड हो सके।
+            generatePDF(true);
+        };
+    </script>
+</body>
+</html>
